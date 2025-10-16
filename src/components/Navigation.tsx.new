@@ -1,0 +1,39 @@
+import { Button } from "./ui/button";
+import { ShoppingCart, Menu } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "./ui/navigation-menu";
+
+interface NavigationProps {
+  visitorType: "B2B" | "B2C";
+  setVisitorType: (type: "B2B" | "B2C") => void;
+}
+
+export function Navigation({ visitorType, setVisitorType }: NavigationProps) {
+  // ... (rest of the component code remains the same until the NavigationMenuContent parts)
+
+  return (
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm"
+          : "bg-transparent"
+      }`}
+    >
+      {/* ... other navigation code ... */}
+      
+      {/* Update all NavigationMenuContent components with className="bg-white" */}
+      <NavigationMenuContent className="bg-white">
+        {/* ... rest of the content ... */}
+      </NavigationMenuContent>
+
+      {/* ... rest of the component ... */}
+    </nav>
+  );
+}
