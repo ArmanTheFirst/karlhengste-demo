@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 
 interface NavigationProps {
   visitorType: "B2B" | "B2C";
@@ -155,15 +157,23 @@ export function Navigation({ visitorType, setVisitorType }: NavigationProps) {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-8">
-            <div className="text-lg">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-4">
+              <Image
+                src="/images/logo.avif"
+                alt="Karl Hengste Logo"
+                width={40}
+                height={40}
+                className="h-10 w-auto object-contain"
+              />
               <span
-                className={`tracking-tight transition-colors ${
+                className={`text-lg font-medium tracking-tight transition-colors ${
                   isScrolled ? "text-gray-900" : "text-white"
                 }`}
               >
                 Karl Hengste
               </span>
-            </div>
+            </Link>
 
             {/* Visitor Type Switcher */}
             <div className="hidden md:flex items-center gap-2">

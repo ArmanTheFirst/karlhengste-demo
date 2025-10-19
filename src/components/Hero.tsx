@@ -76,7 +76,7 @@ export function Hero({ visitorType }: HeroProps) {
             <Button
               size="lg"
               variant="outline"
-              className="border-white/50 text-white hover:bg-white/10 backdrop-blur-sm transition-all hover:scale-105 text-base px-8 py-6"
+              className="border-white/50 text-white bg-white/10 backdrop-blur-sm transition-all hover:scale-105 text-base px-8 py-6"
             >
               {visitorType === "B2B" ? "Beratung anfordern" : "Katalog ansehen"}
             </Button>
