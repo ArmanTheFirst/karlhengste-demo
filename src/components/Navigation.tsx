@@ -18,6 +18,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { title } from "process";
 
 interface NavigationProps {
   visitorType: "B2B" | "B2C";
@@ -50,75 +51,85 @@ export function Navigation({ visitorType, setVisitorType }: NavigationProps) {
 
   const companyLinks = [
     {
-      title: "Über uns",
-      href: "#",
-      description: "Erfahren Sie mehr über unsere Geschichte",
+      title: "Zertifizierungen",
+      href: "/unternehmen/zertifizierungen",
+      description: "Unsere Zertifizierungen",
+    },
+    {
+      title: "Team",
+      href: "/unternehmen/team",
+      description: "Unser Team",
+    },
+    {
+      title: "Vision Mission",
+      href: "/unternehmen/vision-mission",
+      description: "Unsere Vision und Mission",
     },
     {
       title: "Karriere",
-      href: "#",
-      description: "Werden Sie Teil unseres Teams",
+      href: "/unternehmen/karriere",
+      description: "Unsere Karrieremöglichkeiten",
     },
     {
-      title: "Nachhaltigkeit",
-      href: "#",
-      description: "Unser Engagement für die Umwelt",
-    },
-    {
-      title: "Standorte",
-      href: "#",
-      description: "Unsere Produktionsstätten weltweit",
+      title: "Geschichte",
+      href: "/unternehmen/geschichte",
+      description: "Unsere Geschichte",
     },
   ];
 
   const industryLinks = [
     {
-      title: "Automotive",
-      href: "#",
-      description: "Präzisionsteile für Fahrzeugindustrie",
+      title: "Verteidigung",
+      href: "/industrie/verteidigung",
+      description: "Präzisionsteile für die Verteidigung",
     },
     {
-      title: "Maschinenbau",
-      href: "#",
-      description: "Komplexe Baugruppen & Komponenten",
+      title: "Medizinindustrie",
+      href: "/industrie/medizinindustrie",
+      description: "Präzisionsteile für die Medizinindustrie",
     },
     {
-      title: "Elektrotechnik",
-      href: "#",
-      description: "Gehäuse & Schaltschränke",
+      title: "Bauindustrie",
+      href: "/industrie/bauindustrie",
+      description: "Präzisionsteile für die Bauindustrie",
     },
     {
-      title: "Architektur",
-      href: "#",
-      description: "Fassadenelemente & Metallbau",
+      title: "Automobilindustrie",
+      href: "/industrie/automobilindustrie",
+      description: "Präzisionsteile für die Automobilindustrie",
     },
     {
-      title: "Energie",
-      href: "#",
-      description: "Komponenten für erneuerbare Energien",
+      title: "Allgemeine Industrie",
+      href: "/industrie/allgemeine-industrie",
+      description: "Präzisionsteile für die Allgemeine Industrie",
     },
   ];
 
-  const solutionsLinks = [
+  const productLinks = [
     {
-      title: "CNC-Bearbeitung",
-      href: "#",
-      description: "Modernste 5-Achs-Bearbeitung",
+      title: "Sounderloesungen",
+      href: "/produkte/sonderloesungen",
+      description: "Sonderloesungen",
     },
     {
-      title: "Lasertechnologie",
-      href: "#",
-      description: "Präzises Schneiden bis 25mm",
+      title: "Fensterbaenke",
+      href: "/produkte/fensterbaenke",
+      description: "Fensterbaenke",
     },
     {
-      title: "Blechbearbeitung",
-      href: "#",
-      description: "Abkanten, Stanzen, Tiefziehen",
+      title: "Blech Konfigurator",
+      href: "/produkte/blech-konfigurator",
+      description: "Blech Konfigurator",
     },
     {
-      title: "Montage & Logistik",
-      href: "#",
-      description: "Just-in-Time Lieferung",
+      title: "Balkonverkleidungen",
+      href: "/produkte/balkonverkleidungen",
+      description: "Balkonverkleidungen",
+    },
+    {
+      title: "Attiken",
+      href: "/produkte/attiken",
+      description: "Attiken",
     },
   ];
 
@@ -286,11 +297,11 @@ export function Navigation({ visitorType, setVisitorType }: NavigationProps) {
                       isScrolled ? "text-gray-700" : "text-white"
                     } bg-white/10 hover:bg-white/20`}
                   >
-                    Lösungen
+                    Produkte
                   </NavigationMenuTrigger>
                   <NavigationMenuContent className="bg-white">
                     <ul className="grid w-[400px] gap-3 p-4">
-                      {solutionsLinks.map((link) => (
+                      {productLinks.map((link) => (
                         <li key={link.title}>
                           <NavigationMenuLink asChild>
                             <a
