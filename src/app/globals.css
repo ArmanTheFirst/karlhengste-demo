@@ -1,3 +1,6 @@
+:root {
+  --brand: #00863A;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
