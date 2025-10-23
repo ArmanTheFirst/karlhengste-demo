@@ -157,8 +157,12 @@ export async function generateMetadata({
     const title = data?.story?.story?.name
       ? `${data.story.story.name} | Karl Hengste`
       : data?.story?.name
-      ? `${data.story.name} | Karl Hengste`
+      ? `${capitalize(data.story.name)} | Karl Hengste`
       : "Karl Hengste";
+
+    function capitalize(str: string) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
     return { title };
   } catch {
     return { title: "Karl Hengste" };
