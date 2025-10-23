@@ -14,6 +14,7 @@ import { CertificationsStripCMS } from "@/components/cms/CertificationsStripCMS"
 import { KnowledgeBaseTeaserCMS } from "@/components/cms/KnowledgeBaseTeaserCMS";
 import { B2BCredibilityCMS } from "@/components/cms/B2BCredibilityCMS";
 import { ShopPromoCMS } from "@/components/cms/ShopPromoCMS";
+import { NotFoundCMS } from "@/components/cms/NotFoundCMS";
 
 async function fetchWithLocaleFallback(slugPath: string, locale: Locale) {
   // Attempts: requested locale (plain -> prefixed), then English fallback (plain -> prefixed)
@@ -266,6 +267,8 @@ export default async function CmsPage({
                 return (
                   <FooterCMS key={blok._uid} blok={blok} locale={locale} />
                 );
+              case "not_found":
+                return <NotFoundCMS key={blok._uid} blok={blok} />;
               default:
                 return (
                   <section

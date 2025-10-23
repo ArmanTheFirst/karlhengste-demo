@@ -13,6 +13,10 @@ module.exports = {
         "2xl": "1400px",
       },
     },
+    fontFamily: {
+      sans: ['var(--font-lato)', 'sans-serif'],
+      display: ['var(--font-montserrat)', 'sans-serif'],
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
