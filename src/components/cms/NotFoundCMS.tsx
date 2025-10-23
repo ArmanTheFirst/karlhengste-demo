@@ -73,7 +73,7 @@ export function NotFoundCMS({ blok }: { blok: NotFoundBlok }) {
         )}
 
         <div className="mt-16 pt-8 border-t border-gray-200">
-          <p className="text-sm text-gray-500">Prototype</p>
+          <p className="text-sm text-gray-500">Demo</p>
         </div>
       </div>
     </div>
