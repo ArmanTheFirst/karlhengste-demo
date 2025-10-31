@@ -23,6 +23,7 @@ import { ConfiguratorPromo } from "@/components/cms/ConfiguratorPromo";
 import { ProjectReference } from "@/components/cms/ProjectReference";
 import { ProjectReferences } from "@/components/cms/ProjectReferences";
 import { QuoteSection } from "@/components/cms/QuoteSection";
+import { ShopCatalog } from "@/components/shop/ShopCatalog";
 
 async function fetchWithLocaleFallback(slugPath: string, locale: Locale) {
   // Attempts: requested locale (plain -> prefixed), then English fallback (plain -> prefixed)
@@ -185,6 +186,58 @@ export default async function CmsPage({
   const p = await params;
   const locale = (p.locale as Locale) || "en";
   const slugPath = p.slug?.join("/") || "home";
+
+  // Handle Shopify catalog page
+  if (slugPath === "shop/katalog" || slugPath === "shop/catalog") {
+    const storeUrl = process.env.NEXT_PUBLIC_SHOPIFY_STORE_URL;
+    const storefrontToken = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
+
+    if (!storeUrl || !storefrontToken) {
+      return (
+        <main className="max-w-3xl mx-auto px-6 py-16">
+          <h1 className="text-2xl font-semibold mb-4">Shop Configuration Missing</h1>
+          <p className="text-gray-600 mb-4">
+            Please configure Shopify environment variables:
+          </p>
+          <ul className="list-disc list-inside text-gray-600 space-y-2">
+            <li>NEXT_PUBLIC_SHOPIFY_STORE_URL</li>
+            <li>NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN</li>
+          </ul>
+          <p className="mt-4 text-sm text-gray-500">
+            See SHOPIFY_SETUP.md for instructions.
+          </p>
+        </main>
+      );
+    }
+
+    // Fetch header and footer from homepage
+    let headerBlock: any = null;
+    let footerBlock: any = null;
+
+    try {
+      const homeData = await fetchStoryWithFieldFallback("home", locale);
+      const homeStory = homeData?.story?.story || homeData?.story;
+      const homeBody: any[] = Array.isArray(homeStory?.content?.body)
+        ? homeStory.content.body
+        : [];
+      headerBlock = homeBody.find((b) => b.component === "header");
+      footerBlock = homeBody.find((b) => b.component === "footer");
+    } catch (e) {
+      console.warn("Failed to fetch homepage for header/footer:", e);
+    }
+
+    return (
+      <>
+        {headerBlock && <HeaderCMS key={headerBlock._uid} blok={headerBlock} locale={locale} />}
+        <ShopCatalog
+          storeUrl={storeUrl}
+          apiKey={storefrontToken}
+          apiVersion="2024-01"
+        />
+        {footerBlock && <FooterCMS key={footerBlock._uid} blok={footerBlock} locale={locale} />}
+      </>
+    );
+  }
 
   // Helper function to render a block
   const renderBlock = (blok: any) => {

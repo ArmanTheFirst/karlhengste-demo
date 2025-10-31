@@ -1,7 +1,14 @@
 "use client";
 
 import React from "react";
-import { StoryblokRichText, ISbRichtext } from "@storyblok/react";
+import { StoryblokRichText } from "@storyblok/react";
+
+// Define richtext type based on Storyblok's structure
+type ISbRichtext = {
+  type?: string;
+  content?: any[];
+  [key: string]: any;
+};
 
 type IndustryOverviewBlok = {
   _uid: string;
@@ -89,10 +96,8 @@ export function IndustryOverview({ blok }: { blok: IndustryOverviewBlok }) {
           return (
             <div className="text-gray-700 leading-7 richtext-content">
               <StoryblokRichText
-                doc={content as ISbRichtext}
-                resolver={(component, blok) => {
-                  return null;
-                }}
+                doc={content as any}
+                resolvers={{}}
               />
             </div>
           );
