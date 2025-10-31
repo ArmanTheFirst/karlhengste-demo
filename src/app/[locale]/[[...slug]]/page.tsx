@@ -15,6 +15,14 @@ import { KnowledgeBaseTeaserCMS } from "@/components/cms/KnowledgeBaseTeaserCMS"
 import { B2BCredibilityCMS } from "@/components/cms/B2BCredibilityCMS";
 import { ShopPromoCMS } from "@/components/cms/ShopPromoCMS";
 import { NotFoundCMS } from "@/components/cms/NotFoundCMS";
+import { IndustryHero } from "@/components/cms/IndustryHero";
+import { IndustryOverview } from "@/components/cms/IndustryOverview";
+import { ProductTeaser } from "@/components/cms/ProductTeaser";
+import { ProductShowcase } from "@/components/cms/ProductShowcase";
+import { ConfiguratorPromo } from "@/components/cms/ConfiguratorPromo";
+import { ProjectReference } from "@/components/cms/ProjectReference";
+import { ProjectReferences } from "@/components/cms/ProjectReferences";
+import { QuoteSection } from "@/components/cms/QuoteSection";
 
 async function fetchWithLocaleFallback(slugPath: string, locale: Locale) {
   // Attempts: requested locale (plain -> prefixed), then English fallback (plain -> prefixed)
@@ -178,18 +186,148 @@ export default async function CmsPage({
   const locale = (p.locale as Locale) || "en";
   const slugPath = p.slug?.join("/") || "home";
 
+  // Helper function to render a block
+  const renderBlock = (blok: any) => {
+    switch (blok.component) {
+      case "hero_banner":
+        return <HeroBanner key={blok._uid} blok={blok} />;
+      case "grid":
+        return <Grid key={blok._uid} blok={blok} />;
+      case "feature":
+        return <Feature key={blok._uid} blok={blok} />;
+      case "teaser":
+        return <Teaser key={blok._uid} blok={blok} />;
+      case "certification_badge":
+        return <CertificationBadge key={blok._uid} blok={blok} />;
+      case "industry_tiles":
+        return <IndustryTilesCMS key={blok._uid} blok={blok} />;
+      case "industry_showcase":
+        return (
+          <IndustryShowcaseCMS
+            key={blok._uid}
+            blok={blok}
+            locale={locale}
+          />
+        );
+      case "header":
+        return (
+          <HeaderCMS key={blok._uid} blok={blok} locale={locale} />
+        );
+      case "product_breadth":
+        return (
+          <ProductBreadthCMS
+            key={blok._uid}
+            blok={blok}
+            locale={locale}
+          />
+        );
+      case "certifications_strip":
+        return (
+          <CertificationsStripCMS
+            key={blok._uid}
+            blok={blok}
+            locale={locale}
+          />
+        );
+      case "Knowledge Base Teaser":
+        return (
+          <KnowledgeBaseTeaserCMS
+            key={blok._uid}
+            blok={blok}
+            locale={locale}
+          />
+        );
+      case "B2B Credibility":
+        return (
+          <B2BCredibilityCMS
+            key={blok._uid}
+            blok={blok}
+            locale={locale}
+          />
+        );
+      case "shop_promo":
+        return (
+          <ShopPromoCMS key={blok._uid} blok={blok} locale={locale} />
+        );
+      case "footer":
+        return (
+          <FooterCMS key={blok._uid} blok={blok} locale={locale} />
+        );
+      case "not_found":
+        return <NotFoundCMS key={blok._uid} blok={blok} />;
+      // Industry page blocks
+      case "industry-hero":
+        return <IndustryHero key={blok._uid} blok={blok} />;
+      case "industry-overview":
+        return <IndustryOverview key={blok._uid} blok={blok} />;
+      case "product-teaser":
+        // Handle case where Python script uses product-teaser with products array
+        if (blok.products && Array.isArray(blok.products)) {
+          return <ProductShowcase key={blok._uid} blok={blok} />;
+        }
+        return <ProductTeaser key={blok._uid} blok={blok} />;
+      case "product-showcase":
+        return <ProductShowcase key={blok._uid} blok={blok} />;
+      case "configurator-promo":
+        return <ConfiguratorPromo key={blok._uid} blok={blok} />;
+      case "project-reference":
+        return <ProjectReference key={blok._uid} blok={blok} />;
+      case "project-references":
+        return <ProjectReferences key={blok._uid} blok={blok} />;
+      case "quote-section":
+        return <QuoteSection key={blok._uid} blok={blok} />;
+      default:
+        return (
+          <section
+            key={blok._uid}
+            className="max-w-3xl mx-auto px-6 py-8"
+          >
+            <div className="text-sm text-gray-500 mb-2">
+              Unknown block: <code>{blok.component}</code>
+            </div>
+            <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto">
+              {JSON.stringify(blok, null, 2)}
+            </pre>
+          </section>
+        );
+    }
+  };
+
   try {
+    // Fetch homepage to get header and footer
+    let headerBlock: any = null;
+    let footerBlock: any = null;
+    
+    try {
+      const homeData = await fetchStoryWithFieldFallback("home", locale);
+      const homeStory = homeData?.story?.story || homeData?.story;
+      const homeBody: any[] = Array.isArray(homeStory?.content?.body)
+        ? homeStory.content.body
+        : [];
+      
+      // Find header and footer blocks from homepage
+      headerBlock = homeBody.find((b) => b.component === "header");
+      footerBlock = homeBody.find((b) => b.component === "footer");
+    } catch (e) {
+      // If homepage fetch fails, continue without header/footer
+      console.warn("Failed to fetch homepage for header/footer:", e);
+    }
+
     const data = await fetchStoryWithFieldFallback(slugPath, locale);
     const story = data?.story?.story || data?.story;
 
     if (!story) {
       return (
-        <main className="max-w-3xl mx-auto px-6 py-16">
-          <h1 className="text-2xl font-semibold mb-4">Not found in CMS</h1>
-          <p className="text-gray-600">
-            No Storyblok story for: <code>{`/${locale}/${slugPath}`}</code>
-          </p>
-        </main>
+        <>
+          {headerBlock && renderBlock(headerBlock)}
+          <main className="max-w-3xl mx-auto px-6 py-16">
+            <h1 className="text-2xl font-semibold mb-4">Not found in CMS</h1>
+            <p className="text-gray-600">
+              No Storyblok story for: <code>{`/${locale}/${slugPath}`}</code>
+            </p>
+          </main>
+          {footerBlock && renderBlock(footerBlock)}
+        </>
       );
     }
 
@@ -197,109 +335,42 @@ export default async function CmsPage({
       ? story.content.body
       : [];
 
+    // Filter out header and footer from page body (we'll use homepage ones)
+    const pageBody = body.filter(
+      (blok) => blok.component !== "header" && blok.component !== "footer"
+    );
+
+    // Check if first block is a full-screen hero (doesn't need padding)
+    const firstBlock = pageBody[0];
+    const isFullScreenHero = firstBlock?.component === "hero_banner" || firstBlock?.component === "industry-hero";
+    const mainPadding = headerBlock && !isFullScreenHero ? "pt-20" : "";
+
     return (
-      <main>
-        {body.length === 0 ? (
-          <section className="max-w-3xl mx-auto px-6 py-16">
-            <h1 className="text-3xl font-bold mb-4">{story.name}</h1>
-            <p className="text-gray-600">No blocks found in this page.</p>
-          </section>
-        ) : (
-          body.map((blok) => {
-            switch (blok.component) {
-              case "hero_banner":
-                return <HeroBanner key={blok._uid} blok={blok} />;
-              case "grid":
-                return <Grid key={blok._uid} blok={blok} />;
-              case "feature":
-                return <Feature key={blok._uid} blok={blok} />;
-              case "teaser":
-                return <Teaser key={blok._uid} blok={blok} />;
-              case "certification_badge":
-                return <CertificationBadge key={blok._uid} blok={blok} />;
-              case "industry_tiles":
-                return <IndustryTilesCMS key={blok._uid} blok={blok} />;
-              case "industry_showcase":
-                return (
-                  <IndustryShowcaseCMS
-                    key={blok._uid}
-                    blok={blok}
-                    locale={locale}
-                  />
-                );
-              case "header":
-                return (
-                  <HeaderCMS key={blok._uid} blok={blok} locale={locale} />
-                );
-              case "product_breadth":
-                return (
-                  <ProductBreadthCMS
-                    key={blok._uid}
-                    blok={blok}
-                    locale={locale}
-                  />
-                );
-              case "certifications_strip":
-                return (
-                  <CertificationsStripCMS
-                    key={blok._uid}
-                    blok={blok}
-                    locale={locale}
-                  />
-                );
-              case "Knowledge Base Teaser":
-                return (
-                  <KnowledgeBaseTeaserCMS
-                    key={blok._uid}
-                    blok={blok}
-                    locale={locale}
-                  />
-                );
-              case "B2B Credibility":
-                return (
-                  <B2BCredibilityCMS
-                    key={blok._uid}
-                    blok={blok}
-                    locale={locale}
-                  />
-                );
-              case "shop_promo":
-                return (
-                  <ShopPromoCMS key={blok._uid} blok={blok} locale={locale} />
-                );
-              case "footer":
-                return (
-                  <FooterCMS key={blok._uid} blok={blok} locale={locale} />
-                );
-              case "not_found":
-                return <NotFoundCMS key={blok._uid} blok={blok} />;
-              default:
-                return (
-                  <section
-                    key={blok._uid}
-                    className="max-w-3xl mx-auto px-6 py-8"
-                  >
-                    <div className="text-sm text-gray-500 mb-2">
-                      Unknown block: <code>{blok.component}</code>
-                    </div>
-                    <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto">
-                      {JSON.stringify(blok, null, 2)}
-                    </pre>
-                  </section>
-                );
-            }
-          })
-        )}
-      </main>
+      <>
+        {headerBlock && renderBlock(headerBlock)}
+        <main className={mainPadding}>
+          {pageBody.length === 0 ? (
+            <section className="max-w-3xl mx-auto px-6 py-16">
+              <h1 className="text-3xl font-bold mb-4">{story.name}</h1>
+              <p className="text-gray-600">No blocks found in this page.</p>
+            </section>
+          ) : (
+            pageBody.map((blok) => renderBlock(blok))
+          )}
+        </main>
+        {footerBlock && renderBlock(footerBlock)}
+      </>
     );
   } catch (e: any) {
     return (
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="text-2xl font-semibold mb-4">
-          Error loading CMS content
-        </h1>
-        <p className="text-gray-600">{e?.message || "Unknown error"}</p>
-      </main>
+      <>
+        <main className="max-w-3xl mx-auto px-6 py-16">
+          <h1 className="text-2xl font-semibold mb-4">
+            Error loading CMS content
+          </h1>
+          <p className="text-gray-600">{e?.message || "Unknown error"}</p>
+        </main>
+      </>
     );
   }
 }
