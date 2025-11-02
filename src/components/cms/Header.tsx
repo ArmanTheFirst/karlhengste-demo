@@ -5,7 +5,11 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-type LinkField = { cached_url?: string; url?: string } | string | null | undefined;
+type LinkField =
+  | { cached_url?: string; url?: string }
+  | string
+  | null
+  | undefined;
 type NavItem = {
   _uid?: string;
   label?: string;
@@ -14,11 +18,17 @@ type NavItem = {
   icon?: string | null;
 };
 
+type LanguageItem = {
+  _uid: string;
+  name: string;
+  slug: string;
+  equivalent?: LinkField;
+};
+
 type HeaderCMSProps = {
   blok: {
     items?: NavItem[];
-    audience_company_label: string;
-    audience_private_label: string;
+    languages?: LanguageItem[];
     [key: string]: any;
   };
   locale: string;
@@ -38,14 +48,34 @@ function withLocalePrefix(locale: string, href: string): string {
   return `/${locale}${href}`;
 }
 
-function Icon({ name, className }: { name?: string | null; className?: string }) {
+function normalizeLanguageCode(code: string): string {
+  if (!code) return '';
+  return code.toLowerCase().split('-')[0].trim();
+}
+
+function Icon({
+  name,
+  className,
+}: {
+  name?: string | null;
+  className?: string;
+}) {
   if (!name) return null;
   const n = name.toLowerCase();
   switch (n) {
     case "cart":
     case "shopping-cart":
       return (
-        <svg className={className || "h-4 w-4"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className={className || "h-4 w-4"}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <circle cx="9" cy="21" r="1" />
           <circle cx="20" cy="21" r="1" />
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h7.72a2 2 0 0 0 2-1.61L21 6H6" />
@@ -64,10 +94,47 @@ export function HeaderCMS({ blok, locale }: HeaderCMSProps) {
   const pathname = usePathname();
   const router = useRouter();
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [audSel, setAudSel] = useState<0 | 1>(0);
+  
+  // Only show mobile menu if there are navigation items
+  const showMobileMenu = items.length > 0;
 
-  const audienceCompany = blok.audience_company_label;
-  const audiencePrivate = blok.audience_private_label;
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = document.getElementById('language-dropdown');
+      const button = document.querySelector('[aria-haspopup="true"]');
+      
+      if (dropdown && button && 
+          !dropdown.contains(event.target as Node) && 
+          !button.contains(event.target as Node)) {
+        dropdown.classList.add('hidden');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Get languages from blok or use default if not provided
+  const languages: LanguageItem[] = Array.isArray(blok.languages) && blok.languages.length > 0
+    ? blok.languages
+    : [
+        { _uid: "en", name: "EN", slug: "en" },
+        { _uid: "de", name: "DE", slug: "de" },
+      ];
+
+  // Debug log to check the received props
+  console.log('HeaderCMS - Received props:', { 
+    locale, 
+    languages: languages.map(lang => ({
+      name: lang.name,
+      slug: lang.slug,
+      normalized: normalizeLanguageCode(lang.slug),
+      isCurrent: normalizeLanguageCode(lang.slug) === normalizeLanguageCode(locale || 'en')
+    }))
+  });
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -107,26 +174,43 @@ export function HeaderCMS({ blok, locale }: HeaderCMSProps) {
   }, [mobileOpen]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm" role="navigation" aria-label="Primary">
+    <header
+      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
+      role="navigation"
+      aria-label="Primary"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Brand */}
           <Link href={`/${locale}`} className="flex items-center gap-3">
-            <Image src="/images/logo.avif" alt="Karl Hengste" width={36} height={36} className="h-9 w-auto object-contain" />
-            <span className="text-lg font-medium tracking-tight text-gray-900">Karl Hengste</span>
+            <Image
+              src="/images/logo.avif"
+              alt="Karl Hengste"
+              width={36}
+              height={36}
+              className="h-9 w-auto object-contain"
+            />
+            <span className="text-lg font-medium tracking-tight text-gray-900">
+              Karl Hengste
+            </span>
           </Link>
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
             {items.map((it) => {
-              const hasChildren = Array.isArray(it.children) && it.children.length > 0;
+              const hasChildren =
+                Array.isArray(it.children) && it.children.length > 0;
               const href = withLocalePrefix(locale, resolveUrl(it?.url || "/"));
               const key = String(it?._uid || it?.label || Math.random());
               const isOpen = desktopOpenKey === key;
 
               if (!hasChildren) {
                 return (
-                  <Link key={it?._uid || it?.label} href={href} className="px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-[color:var(--brand)]/10 rounded-md transition-colors">
+                  <Link
+                    key={it?._uid || it?.label}
+                    href={href}
+                    className="px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-[color:var(--brand)]/10 rounded-md transition-colors"
+                  >
                     <span className="flex items-center gap-2">
                       <Icon name={it?.icon} className="h-4 w-4 opacity-80" />
                       <span className="relative after:absolute after:inset-x-0 after:-bottom-0.5 after:h-[2px] after:scale-x-0 after:bg-[color:var(--brand)] after:transition-transform hover:after:scale-x-100">
@@ -159,23 +243,41 @@ export function HeaderCMS({ blok, locale }: HeaderCMSProps) {
                       <Icon name={it?.icon} className="h-4 w-4 opacity-80" />
                       <span>{it?.label || "Menu"}</span>
                     </span>
-                    <svg className="h-3.5 w-3.5 opacity-70" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/></svg>
+                    <svg
+                      className="h-3.5 w-3.5 opacity-70"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
+                    </svg>
                   </button>
                   <div
                     className={`absolute left-0 top-full mt-2 min-w-56 rounded-lg border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 transition ease-out duration-200 ${
-                      isOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 pointer-events-none"
+                      isOpen
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 translate-y-1 pointer-events-none"
                     }`}
                     onMouseEnter={cancelClose}
                     onMouseLeave={scheduleClose}
                   >
                     <ul className="py-2">
                       {it.children!.map((child) => {
-                        const chref = withLocalePrefix(locale, resolveUrl(child?.url || "/"));
+                        const chref = withLocalePrefix(
+                          locale,
+                          resolveUrl(child?.url || "/")
+                        );
                         return (
                           <li key={child?._uid || child?.label}>
-                            <Link href={chref} className="block px-3 py-2 text-sm text-gray-700 hover:bg-[color:var(--brand)]/10">
+                            <Link
+                              href={chref}
+                              className="block px-3 py-2 text-sm text-gray-700 hover:bg-[color:var(--brand)]/10"
+                            >
                               <span className="inline-flex items-center gap-2">
-                                <Icon name={(child as any)?.icon} className="h-4 w-4 opacity-80" />
+                                <Icon
+                                  name={(child as any)?.icon}
+                                  className="h-4 w-4 opacity-80"
+                                />
                                 <span>{child?.label || "Link"}</span>
                               </span>
                             </Link>
@@ -189,153 +291,271 @@ export function HeaderCMS({ blok, locale }: HeaderCMSProps) {
             })}
           </nav>
 
-          {/* Audience switcher (desktop, non-functional demo) */}
-          <div className="hidden md:flex items-center gap-3 ml-auto mr-2">
-            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+          {/* Desktop language dropdown */}
+          <div className="flex items-center ml-auto">
+            {languages.length > 0 && (
+              <div className="hidden md:block relative group">
+                <button 
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand)]/30 rounded-md hover:bg-gray-100 transition-colors"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const menu = document.getElementById('language-dropdown');
+                    if (menu) menu.classList.toggle('hidden');
+                  }}
+                >
+                  <span>{languages.find(lang => {
+                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
+                    return cleanSlug === locale || 
+                          normalizeLanguageCode(cleanSlug) === normalizeLanguageCode(locale || 'en');
+                  })?.name || locale.toUpperCase()}</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                <div 
+                  id="language-dropdown" 
+                  className="hidden absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 py-1"
+                  onMouseLeave={() => {
+                    const menu = document.getElementById('language-dropdown');
+                    if (menu) menu.classList.add('hidden');
+                  }}
+                >
+                  {languages.map((lang) => {
+                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
+                    const isCurrent = cleanSlug === locale || 
+                                    normalizeLanguageCode(cleanSlug) === normalizeLanguageCode(locale || 'en');
+                    const href = resolveUrl(lang.equivalent) || `/${lang.slug}`;
+
+                    return (
+                      <Link
+                        key={lang._uid}
+                        href={href}
+                        className={`block px-4 py-2 text-sm ${isCurrent 
+                          ? 'bg-gray-100 text-[color:var(--brand)] font-medium' 
+                          : 'text-gray-700 hover:bg-gray-50'}`}
+                        onClick={() => {
+                          const menu = document.getElementById('language-dropdown');
+                          if (menu) menu.classList.add('hidden');
+                        }}
+                      >
+                        {lang.name || lang.slug.toUpperCase()}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {showMobileMenu && (
               <button
                 type="button"
-                onClick={() => setAudSel(0)}
-                className={`px-3 py-1.5 text-xs transition-colors ${
-                  audSel === 0 ? "bg-[color:var(--brand)] text-white" : "text-gray-700 hover:bg-gray-100"
-                }`}
-                aria-pressed={audSel === 0}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[color:var(--brand)] md:hidden"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-expanded={mobileOpen}
+                aria-label="Toggle navigation"
               >
-                {audienceCompany}
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  fill="none"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
               </button>
-              <button
-                type="button"
-                onClick={() => setAudSel(1)}
-                className={`px-3 py-1.5 text-xs transition-colors ${
-                  audSel === 1 ? "bg-[color:var(--brand)] text-white" : "text-gray-700 hover:bg-gray-100"
-                }`}
-                aria-pressed={audSel === 1}
-              >
-                {audiencePrivate}
-              </button>
-            </div>
+            )}
           </div>
-
-
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-gray-900 hover:bg-gray-100 transition-colors"
-            aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
-            type="button"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-          </button>
         </div>
       </div>
 
       {/* Mobile overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-black/60 transition-opacity ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-40 bg-black/60 transition-opacity ${
+          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
         onClick={() => setMobileOpen(false)}
         aria-hidden={!mobileOpen}
       />
 
-      {/* Mobile panel */}
-      <aside
-        className={`fixed right-0 top-0 z-50 h-full w-screen max-w-none transform bg-white shadow-2xl transition-transform border-t-4 border-[color:var(--brand)] ${
+      {/* Mobile menu panel */}
+      <div
+        className={`fixed inset-y-0 right-0 z-50 w-full bg-white shadow-lg transform transition-transform ease-in-out duration-300 ${
           mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mobile menu"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <Link href={`/${locale}`} className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-            <Image src="/images/logo.avif" alt="Karl Hengste" width={28} height={28} className="h-7 w-auto object-contain" />
-            <span className="text-base font-medium text-gray-900">Karl Hengste</span>
-          </Link>
-          <button className="p-2 text-gray-700 hover:bg-gray-100 rounded-md" onClick={() => setMobileOpen(false)} aria-label="Close menu">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-
-        {/* Audience switcher (mobile, non-functional demo) */}
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden w-full">
-            <button
-              type="button"
-              onClick={() => setAudSel(0)}
-              className={`flex-1 px-4 py-2 text-sm transition-colors ${
-                audSel === 0 ? "bg-[color:var(--brand)] text-white" : "text-gray-700 hover:bg-gray-100"
-              }`}
-              aria-pressed={audSel === 0}
-            >
-              {audienceCompany}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAudSel(1)}
-              className={`flex-1 px-4 py-2 text-sm transition-colors ${
-                audSel === 1 ? "bg-[color:var(--brand)] text-white" : "text-gray-700 hover:bg-gray-100"
-              }`}
-              aria-pressed={audSel === 1}
-            >
-              {audiencePrivate}
-            </button>
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <Link
+                href={`/${locale}`}
+                className="flex items-center gap-3"
+                onClick={() => setMobileOpen(false)}
+              >
+                <Image
+                  src="/images/logo.avif"
+                  alt="Karl Hengste"
+                  width={32}
+                  height={32}
+                  className="h-8 w-auto object-contain"
+                />
+                <span className="text-lg font-medium tracking-tight text-gray-900">
+                  Karl Hengste
+                </span>
+              </Link>
+              <button
+                type="button"
+                className="rounded-md p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[color:var(--brand)]"
+                onClick={() => setMobileOpen(false)}
+              >
+                <svg
+                  className="h-6 w-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-        <nav className="px-2 py-2">
-          {items.map((it) => {
-            const hasChildren = Array.isArray(it.children) && it.children.length > 0;
-            const href = withLocalePrefix(locale, resolveUrl(it?.url || "/"));
-            const key = String(it?._uid || it?.label || Math.random());
-            const isExpanded = !!expanded[key];
-            return (
-              <div key={it?._uid || it?.label} className="mb-1">
-                {hasChildren ? (
-                  <button
-                    type="button"
-                    className="w-full text-left rounded px-4 py-3 text-base text-gray-900 hover:bg-gray-100 inline-flex items-center justify-between"
-                    onClick={() => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
-                    aria-expanded={isExpanded}
-                    aria-controls={`sect-${key}`}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
-                      <span>{it?.label || "Menu"}</span>
-                    </span>
-                    <svg className={`h-5 w-5 transition-transform ${isExpanded ? "rotate-180" : "rotate-0"}`} viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/></svg>
-                  </button>
-                ) : (
-                  <Link href={href} className="block rounded px-4 py-3 text-base text-gray-800 hover:bg-gray-100" onClick={() => setMobileOpen(false)}>
-                    <span className="inline-flex items-center gap-2">
-                      <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
-                      <span>{it?.label || "Link"}</span>
-                    </span>
-                  </Link>
-                )}
-                {hasChildren && (
-                  <div
-                    id={`sect-${key}`}
-                    className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
-                      isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="ml-2 mt-1 flex flex-col">
-                      {it.children!.map((child) => {
-                        const chref = withLocalePrefix(locale, resolveUrl(child?.url || "/"));
-                        return (
-                          <Link key={child?._uid || child?.label} href={chref} className="block rounded px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setMobileOpen(false)}>
-                            <span className="inline-flex items-center gap-2">
-                              <Icon name={(child as any)?.icon} className="h-4 w-4 opacity-80" />
-                              <span>{child?.label || "Link"}</span>
-                            </span>
-                          </Link>
-                        );
-                      })}
+          
+          {/* Main Navigation */}
+          <nav className="flex-1 overflow-y-auto p-2">
+            {items.map((it) => {
+              const hasChildren =
+                Array.isArray(it.children) && it.children.length > 0;
+              const href = withLocalePrefix(locale, resolveUrl(it?.url || "/"));
+              const key = String(it?._uid || it?.label || Math.random());
+              const isExpanded = !!expanded[key];
+              return (
+                <div key={it?._uid || it?.label} className="mb-1">
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      className="w-full text-left rounded px-4 py-3 text-base text-gray-900 hover:bg-gray-100 inline-flex items-center justify-between"
+                      onClick={() =>
+                        setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
+                      }
+                      aria-expanded={isExpanded}
+                      aria-controls={`sect-${key}`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
+                        <span>{it?.label || "Menu"}</span>
+                      </span>
+                      <svg
+                        className={`h-5 w-5 transition-transform ${
+                          isExpanded ? "rotate-180" : "rotate-0"
+                        }`}
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <Link
+                      href={href}
+                      className="block rounded px-4 py-3 text-base text-gray-800 hover:bg-gray-100"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
+                        <span>{it?.label || "Link"}</span>
+                      </span>
+                    </Link>
+                  )}
+                  {hasChildren && (
+                    <div
+                      id={`sect-${key}`}
+                      className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                        isExpanded
+                          ? "max-h-96 opacity-100"
+                          : "max-h-0 opacity-0"
+                      }`}
+                    >
+                      <div className="ml-2 mt-1 flex flex-col">
+                        {it.children!.map((child) => {
+                          const chref = withLocalePrefix(
+                            locale,
+                            resolveUrl(child?.url || "/")
+                          );
+                          return (
+                            <Link
+                              key={child?._uid || child?.label}
+                              href={chref}
+                              className="block rounded px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              onClick={() => setMobileOpen(false)}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <Icon
+                                  name={(child as any)?.icon}
+                                  className="h-4 w-4 opacity-80"
+                                />
+                                <span>{child?.label || "Link"}</span>
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+          
+          {/* Language Switcher - Fixed at bottom */}
+          {languages.length > 0 && (
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <div className="relative">
+                <select
+                  className="block w-full pl-3 pr-3 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-[color:var(--brand)] sm:text-sm rounded-md bg-white"
+                  value={locale}
+                  onChange={(e) => {
+                    const selectedLang = languages.find(lang => {
+                      const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
+                      return cleanSlug === e.target.value;
+                    });
+                    if (selectedLang) {
+                      const href = resolveUrl(selectedLang.equivalent) || `/${selectedLang.slug}`;
+                      window.location.href = href;
+                    }
+                    setMobileOpen(false);
+                  }}
+                >
+                  {languages.map((lang) => {
+                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
+                    return (
+                      <option 
+                        key={`mobile-${lang._uid}`} 
+                        value={cleanSlug}
+                      >
+                        {lang.name || lang.slug.toUpperCase()}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-            );
-          })}
-        </nav>
-      </aside>
+            </div>
+          )}
+        </div>
+      </div>
     </header>
   );
 }
