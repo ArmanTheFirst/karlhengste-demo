@@ -195,7 +195,9 @@ export default async function CmsPage({
     if (!storeUrl || !storefrontToken) {
       return (
         <main className="max-w-3xl mx-auto px-6 py-16">
-          <h1 className="text-2xl font-semibold mb-4">Shop Configuration Missing</h1>
+          <h1 className="text-2xl font-semibold mb-4">
+            Shop Configuration Missing
+          </h1>
           <p className="text-gray-600 mb-4">
             Please configure Shopify environment variables:
           </p>
@@ -228,13 +230,25 @@ export default async function CmsPage({
 
     return (
       <>
-        {headerBlock && <HeaderCMS key={headerBlock._uid} blok={headerBlock} locale={locale} />}
+        {headerBlock && (
+          <HeaderCMS
+            key={headerBlock._uid}
+            blok={headerBlock}
+            locale={locale}
+          />
+        )}
         <ShopCatalog
           storeUrl={storeUrl}
           apiKey={storefrontToken}
           apiVersion="2024-01"
         />
-        {footerBlock && <FooterCMS key={footerBlock._uid} blok={footerBlock} locale={locale} />}
+        {footerBlock && (
+          <FooterCMS
+            key={footerBlock._uid}
+            blok={footerBlock}
+            locale={locale}
+          />
+        )}
       </>
     );
   }
@@ -256,56 +270,30 @@ export default async function CmsPage({
         return <IndustryTilesCMS key={blok._uid} blok={blok} />;
       case "industry_showcase":
         return (
-          <IndustryShowcaseCMS
-            key={blok._uid}
-            blok={blok}
-            locale={locale}
-          />
+          <IndustryShowcaseCMS key={blok._uid} blok={blok} locale={locale} />
         );
       case "header":
-        return (
-          <HeaderCMS key={blok._uid} blok={blok} locale={locale} />
-        );
+        return <HeaderCMS key={blok._uid} blok={blok} locale={locale} />;
       case "product_breadth":
         return (
-          <ProductBreadthCMS
-            key={blok._uid}
-            blok={blok}
-            locale={locale}
-          />
+          <ProductBreadthCMS key={blok._uid} blok={blok} locale={locale} />
         );
       case "certifications_strip":
         return (
-          <CertificationsStripCMS
-            key={blok._uid}
-            blok={blok}
-            locale={locale}
-          />
+          <CertificationsStripCMS key={blok._uid} blok={blok} locale={locale} />
         );
       case "Knowledge Base Teaser":
         return (
-          <KnowledgeBaseTeaserCMS
-            key={blok._uid}
-            blok={blok}
-            locale={locale}
-          />
+          <KnowledgeBaseTeaserCMS key={blok._uid} blok={blok} locale={locale} />
         );
       case "B2B Credibility":
         return (
-          <B2BCredibilityCMS
-            key={blok._uid}
-            blok={blok}
-            locale={locale}
-          />
+          <B2BCredibilityCMS key={blok._uid} blok={blok} locale={locale} />
         );
       case "shop_promo":
-        return (
-          <ShopPromoCMS key={blok._uid} blok={blok} locale={locale} />
-        );
+        return <ShopPromoCMS key={blok._uid} blok={blok} locale={locale} />;
       case "footer":
-        return (
-          <FooterCMS key={blok._uid} blok={blok} locale={locale} />
-        );
+        return <FooterCMS key={blok._uid} blok={blok} locale={locale} />;
       case "not_found":
         return <NotFoundCMS key={blok._uid} blok={blok} />;
       // Industry page blocks
@@ -331,10 +319,7 @@ export default async function CmsPage({
         return <QuoteSection key={blok._uid} blok={blok} />;
       default:
         return (
-          <section
-            key={blok._uid}
-            className="max-w-3xl mx-auto px-6 py-8"
-          >
+          <section key={blok._uid} className="max-w-3xl mx-auto px-6 py-8">
             <div className="text-sm text-gray-500 mb-2">
               Unknown block: <code>{blok.component}</code>
             </div>
@@ -350,14 +335,14 @@ export default async function CmsPage({
     // Fetch homepage to get header and footer
     let headerBlock: any = null;
     let footerBlock: any = null;
-    
+
     try {
       const homeData = await fetchStoryWithFieldFallback("home", locale);
       const homeStory = homeData?.story?.story || homeData?.story;
       const homeBody: any[] = Array.isArray(homeStory?.content?.body)
         ? homeStory.content.body
         : [];
-      
+
       // Find header and footer blocks from homepage
       headerBlock = homeBody.find((b) => b.component === "header");
       footerBlock = homeBody.find((b) => b.component === "footer");
@@ -395,7 +380,9 @@ export default async function CmsPage({
 
     // Check if first block is a full-screen hero (doesn't need padding)
     const firstBlock = pageBody[0];
-    const isFullScreenHero = firstBlock?.component === "hero_banner" || firstBlock?.component === "industry-hero";
+    const isFullScreenHero =
+      firstBlock?.component === "hero_banner" ||
+      firstBlock?.component === "industry-hero";
     const mainPadding = headerBlock && !isFullScreenHero ? "pt-20" : "";
 
     return (

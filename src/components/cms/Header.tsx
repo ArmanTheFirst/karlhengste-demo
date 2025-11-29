@@ -4,28 +4,32 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
+// Storyblok-compatible types (must match previous shapes)
 type LinkField =
   | { cached_url?: string; url?: string }
   | string
   | null
   | undefined;
-type NavItem = {
+
+export type NavItem = {
   _uid?: string;
   label?: string;
   url?: LinkField;
   children?: NavItem[];
   icon?: string | null;
+  isMegaMenu?: boolean;
 };
 
-type LanguageItem = {
+export type LanguageItem = {
   _uid: string;
   name: string;
   slug: string;
   equivalent?: LinkField;
 };
 
-type HeaderCMSProps = {
+export type HeaderCMSProps = {
   blok: {
     items?: NavItem[];
     languages?: LanguageItem[];
@@ -49,8 +53,8 @@ function withLocalePrefix(locale: string, href: string): string {
 }
 
 function normalizeLanguageCode(code: string): string {
-  if (!code) return '';
-  return code.toLowerCase().split('-')[0].trim();
+  if (!code) return "";
+  return code.toLowerCase().split("-")[0].trim();
 }
 
 function Icon({
@@ -88,474 +92,423 @@ function Icon({
 
 export function HeaderCMS({ blok, locale }: HeaderCMSProps) {
   const items: NavItem[] = Array.isArray(blok?.items) ? blok.items : [];
-  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Desktop hover/click open tracking
   const [desktopOpenKey, setDesktopOpenKey] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const hoveredItem = useRef<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Mobile/Menu State
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileStack, setMobileStack] = useState<
+    { title?: string; items: NavItem[] }[]
+  >([]);
+  // Desktop panel stack (for the right side of the full screen menu)
+  const [selectedCategory, setSelectedCategory] = useState<NavItem | null>(
+    items[0] || null
+  );
+
+  // Misc
   const pathname = usePathname();
   const router = useRouter();
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // Only show mobile menu if there are navigation items
-  const showMobileMenu = items.length > 0;
 
-  // Close dropdown when clicking outside
+  // Languages
+  const languages: LanguageItem[] =
+    Array.isArray(blok?.languages) && blok.languages.length > 0
+      ? blok.languages
+      : [
+          { _uid: "en", name: "EN", slug: "en" },
+          { _uid: "de", name: "DE", slug: "de" },
+        ];
+
+  // Close desktop menus on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const dropdown = document.getElementById('language-dropdown');
-      const button = document.querySelector('[aria-haspopup="true"]');
-      
-      if (dropdown && button && 
-          !dropdown.contains(event.target as Node) && 
-          !button.contains(event.target as Node)) {
-        dropdown.classList.add('hidden');
-      }
+      const dropdowns = document.querySelectorAll(
+        ".dropdown-menu, #language-dropdown"
+      );
+      const buttons = document.querySelectorAll('[aria-haspopup="true"]');
+      let shouldClose = true;
+      dropdowns.forEach((dropdown) => {
+        if (dropdown.contains(event.target as Node)) shouldClose = false;
+      });
+      buttons.forEach((button) => {
+        if (button.contains(event.target as Node)) shouldClose = false;
+      });
+      if (shouldClose) setDesktopOpenKey(null);
     };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Get languages from blok or use default if not provided
-  const languages: LanguageItem[] = Array.isArray(blok.languages) && blok.languages.length > 0
-    ? blok.languages
-    : [
-        { _uid: "en", name: "EN", slug: "en" },
-        { _uid: "de", name: "DE", slug: "de" },
-      ];
-
-  // Debug log to check the received props
-  console.log('HeaderCMS - Received props:', { 
-    locale, 
-    languages: languages.map(lang => ({
-      name: lang.name,
-      slug: lang.slug,
-      normalized: normalizeLanguageCode(lang.slug),
-      isCurrent: normalizeLanguageCode(lang.slug) === normalizeLanguageCode(locale || 'en')
-    }))
-  });
-
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-
-  const scheduleClose = () => {
-    cancelClose();
-    closeTimer.current = setTimeout(() => setDesktopOpenKey(null), 180);
-  };
-
-  function switchTo(target: "en" | "de") {
-    const p = pathname || "/";
-    const seg = p.split("/").filter(Boolean);
-    if (seg.length > 0 && (seg[0] === "en" || seg[0] === "de")) {
-      seg[0] = target;
-    } else {
-      seg.unshift(target);
-    }
-    const next = "/" + seg.join("/");
-    router.push(next);
-    setMobileOpen(false);
-  }
-
-  // Lock scroll when mobile menu is open
+  // Lock scroll when mobile menu is open and reset stack
   useEffect(() => {
     const body = document.body;
     if (mobileOpen) {
       const prev = body.style.overflow;
       body.style.overflow = "hidden";
+      setMobileStack([]);
+      // Reset desktop selection when opening menu
+      if (items.length > 0) setSelectedCategory(items[0]);
+      
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setMobileOpen(false);
+      };
+      window.addEventListener("keydown", onKey);
       return () => {
         body.style.overflow = prev;
+        window.removeEventListener("keydown", onKey);
       };
     }
-  }, [mobileOpen]);
+  }, [mobileOpen, items]);
+
+  const showMobileMenu = items.length > 0;
+
+  // Optimized Animation Variants (Spring Physics)
+  const menuVariants = {
+    closed: {
+      clipPath: "inset(0 0 100% 0)",
+      transition: { type: "spring", stiffness: 300, damping: 30 } as const,
+    },
+    open: {
+      clipPath: "inset(0 0 0% 0)",
+      transition: { type: "spring", stiffness: 200, damping: 25 } as const,
+    },
+  };
+
+  const contentVariants = {
+    hidden: { opacity: 0, x: 10 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.2, ease: "easeOut" } as const },
+  };
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
-      role="navigation"
-      aria-label="Primary"
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 font-[family-name:var(--font-manrope)] ${
+        mobileOpen
+          ? "bg-[color:var(--brand-modern)] text-[color:var(--brand-contrast)]"
+          : "bg-white/90 backdrop-blur-xl text-[color:var(--brand-modern)] border-b border-black/5 shadow-sm"
+      }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between gap-4">
-          {/* Brand */}
-          <Link href={`/${locale}`} className="flex items-center gap-3">
-            <Image
-              src="/images/logo.avif"
-              alt="Karl Hengste"
-              width={36}
-              height={36}
-              className="h-9 w-auto object-contain"
-            />
-            <span className="text-lg font-medium tracking-tight text-gray-900">
+      <div className="max-w-[1920px] mx-auto px-6 sm:px-8">
+        <div className="flex items-center h-24 gap-8">
+          {/* Logo */}
+          <Link
+            href={withLocalePrefix(locale, "/")}
+            className="flex items-center gap-4 group z-50 relative"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div className="relative overflow-hidden rounded-sm shadow-sm transition-transform duration-300 group-hover:scale-105 bg-white">
+              <Image
+                src="/images/logo.avif"
+                alt="Logo"
+                width={56}
+                height={56}
+                className="object-cover"
+              />
+            </div>
+            <span
+              className={`text-2xl font-bold tracking-tight transition-colors ${
+                mobileOpen
+                  ? "text-[color:var(--brand-contrast)]"
+                  : "text-[color:var(--brand-modern)]"
+              }`}
+            >
               Karl Hengste
             </span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {items.map((it) => {
-              const hasChildren =
-                Array.isArray(it.children) && it.children.length > 0;
-              const href = withLocalePrefix(locale, resolveUrl(it?.url || "/"));
-              const key = String(it?._uid || it?.label || Math.random());
-              const isOpen = desktopOpenKey === key;
+          {/* Spacer */}
+          <div className="flex-1" />
 
-              if (!hasChildren) {
-                return (
-                  <Link
-                    key={it?._uid || it?.label}
-                    href={href}
-                    className="px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-[color:var(--brand)]/10 rounded-md transition-colors"
+          {/* Right controls: menu toggle */}
+          <div className="flex items-center gap-6 z-50 relative">
+             {/* Language Switcher (Visible on Desktop Header when menu is closed) */}
+             {!mobileOpen && (
+              <div className="hidden md:flex items-center gap-4 mr-4">
+                 <select
+                    className="bg-transparent text-sm font-bold text-[color:var(--brand-modern)] focus:outline-none cursor-pointer uppercase tracking-wider opacity-80 hover:opacity-100 transition-opacity"
+                    value={(
+                      languages.find(
+                        (l) => l.slug.replace(/^\//, "") === locale
+                      )?.slug || locale
+                    ).replace(/^\//, "")}
+                    onChange={(e) => {
+                      const target = e.target.value;
+                      const href = resolveUrl({ cached_url: target });
+                      window.location.href = href.startsWith("/")
+                        ? href
+                        : `/${target}`;
+                    }}
                   >
-                    <span className="flex items-center gap-2">
-                      <Icon name={it?.icon} className="h-4 w-4 opacity-80" />
-                      <span className="relative after:absolute after:inset-x-0 after:-bottom-0.5 after:h-[2px] after:scale-x-0 after:bg-[color:var(--brand)] after:transition-transform hover:after:scale-x-100">
-                        {it?.label || "Link"}
-                      </span>
-                    </span>
-                  </Link>
-                );
-              }
-
-              return (
-                <div
-                  key={key}
-                  className="relative"
-                  onMouseEnter={() => {
-                    cancelClose();
-                    setDesktopOpenKey(key);
-                  }}
-                  onMouseLeave={scheduleClose}
-                >
-                  <button
-                    className="px-3 py-2 text-sm inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand)]/30"
-                    aria-haspopup="menu"
-                    aria-expanded={isOpen}
-                    type="button"
-                    onFocus={() => setDesktopOpenKey(key)}
-                    onBlur={scheduleClose}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Icon name={it?.icon} className="h-4 w-4 opacity-80" />
-                      <span>{it?.label || "Menu"}</span>
-                    </span>
-                    <svg
-                      className="h-3.5 w-3.5 opacity-70"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
-                    </svg>
-                  </button>
-                  <div
-                    className={`absolute left-0 top-full mt-2 min-w-56 rounded-lg border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 transition ease-out duration-200 ${
-                      isOpen
-                        ? "opacity-100 translate-y-0"
-                        : "opacity-0 translate-y-1 pointer-events-none"
-                    }`}
-                    onMouseEnter={cancelClose}
-                    onMouseLeave={scheduleClose}
-                  >
-                    <ul className="py-2">
-                      {it.children!.map((child) => {
-                        const chref = withLocalePrefix(
-                          locale,
-                          resolveUrl(child?.url || "/")
-                        );
-                        return (
-                          <li key={child?._uid || child?.label}>
-                            <Link
-                              href={chref}
-                              className="block px-3 py-2 text-sm text-gray-700 hover:bg-[color:var(--brand)]/10"
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Icon
-                                  name={(child as any)?.icon}
-                                  className="h-4 w-4 opacity-80"
-                                />
-                                <span>{child?.label || "Link"}</span>
-                              </span>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </div>
-              );
-            })}
-          </nav>
-
-          {/* Desktop language dropdown */}
-          <div className="flex items-center ml-auto">
-            {languages.length > 0 && (
-              <div className="hidden md:block relative group">
-                <button 
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand)]/30 rounded-md hover:bg-gray-100 transition-colors"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const menu = document.getElementById('language-dropdown');
-                    if (menu) menu.classList.toggle('hidden');
-                  }}
-                >
-                  <span>{languages.find(lang => {
-                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
-                    return cleanSlug === locale || 
-                          normalizeLanguageCode(cleanSlug) === normalizeLanguageCode(locale || 'en');
-                  })?.name || locale.toUpperCase()}</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                
-                <div 
-                  id="language-dropdown" 
-                  className="hidden absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 py-1"
-                  onMouseLeave={() => {
-                    const menu = document.getElementById('language-dropdown');
-                    if (menu) menu.classList.add('hidden');
-                  }}
-                >
-                  {languages.map((lang) => {
-                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
-                    const isCurrent = cleanSlug === locale || 
-                                    normalizeLanguageCode(cleanSlug) === normalizeLanguageCode(locale || 'en');
-                    const href = resolveUrl(lang.equivalent) || `/${lang.slug}`;
-
-                    return (
-                      <Link
+                    {languages.map((lang) => (
+                      <option
                         key={lang._uid}
-                        href={href}
-                        className={`block px-4 py-2 text-sm ${isCurrent 
-                          ? 'bg-gray-100 text-[color:var(--brand)] font-medium' 
-                          : 'text-gray-700 hover:bg-gray-50'}`}
-                        onClick={() => {
-                          const menu = document.getElementById('language-dropdown');
-                          if (menu) menu.classList.add('hidden');
-                        }}
+                        value={(lang.slug || "").replace(/^\//, "")}
+                        className="text-black"
                       >
-                        {lang.name || lang.slug.toUpperCase()}
-                      </Link>
-                    );
-                  })}
-                </div>
+                        {lang.name.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
               </div>
-            )}
+             )}
 
             {showMobileMenu && (
               <button
                 type="button"
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[color:var(--brand)] md:hidden"
+                className={`group relative inline-flex items-center justify-center p-2 rounded-full transition-all duration-300 focus:outline-none ${
+                  mobileOpen
+                    ? "text-white hover:bg-white/10"
+                    : "text-[color:var(--brand-modern)] hover:bg-[color:var(--brand-modern)]/5"
+                }`}
                 onClick={() => setMobileOpen(!mobileOpen)}
                 aria-expanded={mobileOpen}
                 aria-label="Toggle navigation"
               >
-                <svg
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  fill="none"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
+                <span className={`text-sm font-bold mr-3 uppercase tracking-widest ${mobileOpen ? "text-white" : "text-[color:var(--brand-modern)]"}`}>
+                  {mobileOpen ? "Close" : "Menu"}
+                </span>
+                <div className={`relative w-10 h-10 flex items-center justify-center rounded-full border transition-all duration-300 ${
+                    mobileOpen ? "border-white/30 bg-white/10" : "border-[color:var(--brand-modern)]/20"
+                }`}>
+                    <AnimatePresence mode="wait">
+                    {mobileOpen ? (
+                        <motion.svg
+                        key="close"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        fill="none"
+                        strokeWidth="2"
+                        >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                        />
+                        </motion.svg>
+                    ) : (
+                        <motion.svg
+                        key="menu"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        fill="none"
+                        strokeWidth="2"
+                        >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4 8h16M4 16h16"
+                        />
+                        </motion.svg>
+                    )}
+                    </AnimatePresence>
+                </div>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Mobile overlay */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/60 transition-opacity ${
-          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden={!mobileOpen}
-      />
-
-      {/* Mobile menu panel */}
-      <div
-        className={`fixed inset-y-0 right-0 z-50 w-full bg-white shadow-lg transform transition-transform ease-in-out duration-300 ${
-          mobileOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <Link
-                href={`/${locale}`}
-                className="flex items-center gap-3"
-                onClick={() => setMobileOpen(false)}
-              >
-                <Image
-                  src="/images/logo.avif"
-                  alt="Karl Hengste"
-                  width={32}
-                  height={32}
-                  className="h-8 w-auto object-contain"
-                />
-                <span className="text-lg font-medium tracking-tight text-gray-900">
-                  Karl Hengste
-                </span>
-              </Link>
-              <button
-                type="button"
-                className="rounded-md p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[color:var(--brand)]"
-                onClick={() => setMobileOpen(false)}
-              >
-                <svg
-                  className="h-6 w-6"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          {/* Main Navigation */}
-          <nav className="flex-1 overflow-y-auto p-2">
-            {items.map((it) => {
-              const hasChildren =
-                Array.isArray(it.children) && it.children.length > 0;
-              const href = withLocalePrefix(locale, resolveUrl(it?.url || "/"));
-              const key = String(it?._uid || it?.label || Math.random());
-              const isExpanded = !!expanded[key];
-              return (
-                <div key={it?._uid || it?.label} className="mb-1">
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      className="w-full text-left rounded px-4 py-3 text-base text-gray-900 hover:bg-gray-100 inline-flex items-center justify-between"
-                      onClick={() =>
-                        setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
-                      }
-                      aria-expanded={isExpanded}
-                      aria-controls={`sect-${key}`}
-                    >
-                      <span className="inline-flex items-center gap-2">
-                        <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
-                        <span>{it?.label || "Menu"}</span>
-                      </span>
-                      <svg
-                        className={`h-5 w-5 transition-transform ${
-                          isExpanded ? "rotate-180" : "rotate-0"
-                        }`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <Link
-                      href={href}
-                      className="block rounded px-4 py-3 text-base text-gray-800 hover:bg-gray-100"
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <span className="inline-flex items-center gap-2">
-                        <Icon name={it?.icon} className="h-5 w-5 opacity-80" />
-                        <span>{it?.label || "Link"}</span>
-                      </span>
-                    </Link>
-                  )}
-                  {hasChildren && (
-                    <div
-                      id={`sect-${key}`}
-                      className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
-                        isExpanded
-                          ? "max-h-96 opacity-100"
-                          : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      <div className="ml-2 mt-1 flex flex-col">
-                        {it.children!.map((child) => {
-                          const chref = withLocalePrefix(
-                            locale,
-                            resolveUrl(child?.url || "/")
-                          );
-                          return (
-                            <Link
-                              key={child?._uid || child?.label}
-                              href={chref}
-                              className="block rounded px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              onClick={() => setMobileOpen(false)}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Icon
-                                  name={(child as any)?.icon}
-                                  className="h-4 w-4 opacity-80"
-                                />
-                                <span>{child?.label || "Link"}</span>
-                              </span>
-                            </Link>
-                          );
+      {/* Full Screen Menu Container */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial="closed"
+            animate="open"
+            exit="closed"
+            variants={menuVariants}
+            className="fixed inset-0 top-0 z-40 bg-[color:var(--brand-modern)] text-white pt-24 will-change-transform"
+          >
+            {/* Desktop Layout (Full Screen) */}
+            <div className="hidden md:flex h-full w-full max-w-[1920px] mx-auto">
+                {/* Left Sidebar: Top Level Navigation */}
+                <div className="w-1/3 lg:w-1/4 h-full border-r border-white/10 flex flex-col p-8 lg:p-12 overflow-y-auto">
+                    <nav className="space-y-1">
+                        {items.map((item, index) => {
+                            const isActive = selectedCategory?._uid === item._uid || selectedCategory?.label === item.label;
+                            return (
+                                <button
+                                    key={(item._uid || item.label || "") + index}
+                                    onClick={() => setSelectedCategory(item)}
+                                    className={`w-full text-left text-3xl lg:text-4xl font-bold py-4 transition-all duration-200 tracking-tight ${
+                                        isActive 
+                                          ? "text-white opacity-100 pl-4 border-l-4 border-white" 
+                                          : "text-white opacity-60 hover:opacity-100 pl-0 border-l-0 border-transparent"
+                                    }`}
+                                >
+                                    {item.label}
+                                </button>
+                            );
                         })}
-                      </div>
-                    </div>
-                  )}
+                    </nav>
                 </div>
-              );
-            })}
-          </nav>
-          
-          {/* Language Switcher - Fixed at bottom */}
-          {languages.length > 0 && (
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <div className="relative">
-                <select
-                  className="block w-full pl-3 pr-3 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-[color:var(--brand)] sm:text-sm rounded-md bg-white"
-                  value={locale}
-                  onChange={(e) => {
-                    const selectedLang = languages.find(lang => {
-                      const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
-                      return cleanSlug === e.target.value;
-                    });
-                    if (selectedLang) {
-                      const href = resolveUrl(selectedLang.equivalent) || `/${selectedLang.slug}`;
-                      window.location.href = href;
-                    }
-                    setMobileOpen(false);
-                  }}
-                >
-                  {languages.map((lang) => {
-                    const cleanSlug = lang.slug ? lang.slug.replace(/^\//, '') : '';
-                    return (
-                      <option 
-                        key={`mobile-${lang._uid}`} 
-                        value={cleanSlug}
-                      >
-                        {lang.name || lang.slug.toUpperCase()}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+
+                {/* Right Panel: Content */}
+                <div className="flex-1 h-full bg-black/10 p-12 lg:p-20 overflow-y-auto">
+                    <AnimatePresence mode="wait">
+                        {selectedCategory && (
+                            <motion.div
+                                key={selectedCategory.label}
+                                initial="hidden"
+                                animate="visible"
+                                exit="hidden"
+                                variants={contentVariants}
+                                className="max-w-4xl"
+                            >
+                                <div className="flex items-center gap-4 mb-12 opacity-50">
+                                    <Icon name={selectedCategory.icon} className="h-8 w-8" />
+                                    <span className="text-sm font-bold uppercase tracking-widest">
+                                        {selectedCategory.label}
+                                    </span>
+                                </div>
+
+                                {selectedCategory.children && selectedCategory.children.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-x-12 gap-y-8">
+                                        {selectedCategory.children.map((child, idx) => (
+                                            <Link
+                                                key={idx}
+                                                href={withLocalePrefix(locale, resolveUrl(child.url || "/"))}
+                                                className="group block"
+                                                onClick={() => setMobileOpen(false)}
+                                            >
+                                                <h3 className="text-xl font-bold mb-2 group-hover:text-[color:var(--brand-contrast)] transition-colors flex items-center gap-2 tracking-tight">
+                                                    {child.label}
+                                                    <svg className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                                    </svg>
+                                                </h3>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-start gap-6">
+                                        <h2 className="text-5xl font-extrabold leading-tight tracking-tighter">
+                                            {selectedCategory.label}
+                                        </h2>
+                                        <Link
+                                            href={withLocalePrefix(locale, resolveUrl(selectedCategory.url || "/"))}
+                                            className="inline-flex items-center gap-3 px-8 py-4 bg-white text-[color:var(--brand-modern)] rounded-full font-bold hover:bg-white/90 transition-colors"
+                                            onClick={() => setMobileOpen(false)}
+                                        >
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                            </svg>
+                                        </Link>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Mobile Layout */}
+            <div className="md:hidden h-full flex flex-col">
+                 <div className="flex-1 overflow-y-auto px-6 pb-24">
+                    <AnimatePresence mode="popLayout">
+                        {mobileStack.length > 0 ? (
+                             <motion.div
+                                key="submenu"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                             >
+                                <button
+                                    onClick={() => setMobileStack(s => s.slice(0, -1))}
+                                    className="flex items-center gap-2 text-white/60 hover:text-white mb-8 pt-4"
+                                >
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </button>
+                                <h2 className="text-3xl font-bold mb-8 tracking-tight">{mobileStack[mobileStack.length - 1].title}</h2>
+                                <div className="space-y-4">
+                                    {mobileStack[mobileStack.length - 1].items.map((item, idx) => (
+                                        <Link
+                                            key={idx}
+                                            href={withLocalePrefix(locale, resolveUrl(item.url || "/"))}
+                                            className="block p-4 rounded-xl bg-white/5 border border-white/5"
+                                            onClick={() => setMobileOpen(false)}
+                                        >
+                                            <span className="text-lg font-bold tracking-tight">{item.label}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                             </motion.div>
+                        ) : (
+                            <motion.div
+                                key="root"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="space-y-2 pt-4"
+                            >
+                                {items.map((item, idx) => {
+                                    const hasChildren = item.children && item.children.length > 0;
+                                    return (
+                                        <div key={idx}>
+                                            {hasChildren ? (
+                                                <button
+                                                    onClick={() => setMobileStack(s => [...s, { title: item.label, items: item.children || [] }])}
+                                                    className="w-full flex items-center justify-between py-4 border-b border-white/10 text-2xl font-bold tracking-tight"
+                                                >
+                                                    {item.label}
+                                                    <svg className="w-6 h-6 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            ) : (
+                                                <Link
+                                                    href={withLocalePrefix(locale, resolveUrl(item.url || "/"))}
+                                                    className="block py-4 border-b border-white/10 text-2xl font-bold tracking-tight"
+                                                    onClick={() => setMobileOpen(false)}
+                                                >
+                                                    {item.label}
+                                                </Link>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                 </div>
+
+                 {/* Mobile Footer with Language Switcher */}
+                 <div className="p-6 border-t border-white/10 bg-black/20">
+                    <div className="flex items-center justify-between">
+                         <div className="flex gap-4">
+                            {languages.map((lang) => (
+                                <button
+                                    key={lang._uid}
+                                    onClick={() => {
+                                        const href = resolveUrl({ cached_url: lang.slug });
+                                        window.location.href = href.startsWith("/") ? href : `/${lang.slug}`;
+                                    }}
+                                    className={`text-sm font-bold uppercase tracking-wide px-3 py-1 rounded-full border ${
+                                        (lang.slug.replace(/^\//, "") === locale) 
+                                        ? "bg-white text-[color:var(--brand-modern)] border-white" 
+                                        : "text-white border-white/30"
+                                    }`}
+                                >
+                                    {lang.name}
+                                </button>
+                            ))}
+                         </div>
+                    </div>
+                 </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

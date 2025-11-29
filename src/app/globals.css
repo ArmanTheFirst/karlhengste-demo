@@ -1,5 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --brand: #00863A;
+  --brand: #009944;
+  --brand-contrast: #ffffff;
+  --brand-600: #009944;
+  --brand-700: #007a36;
+  --ink: #0f172a; /* slate-900 like deep ink */
+  --ink-700: #334155; /* slate-700 */
+  --surface: #ffffff;
+  --surface-muted: #f8fafc; /* subtle background */
+  /* Professional green shades for header/panel */
+  --brand-nav: #0b6a32; /* darker, serious green for header when open */
+  --brand-panel: #094f27; /* even darker for the panel content */
+  /* Unified modern green tone for open menu */
+  --brand-modern: #3d8b6e; /* modern, muted green/teal */
+  --divider-on-brand: rgba(255, 255, 255, 0.25);
+  --brand-modern-pane: #357f66; /* slight variant for child panel */
+}
+
+html, body {
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 @tailwind base;
 @tailwind components;

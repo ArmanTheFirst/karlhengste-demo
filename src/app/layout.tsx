@@ -1,5 +1,5 @@
 import { ThemeProvider } from "@/components/theme-provider";
-import { Montserrat, Lato } from "next/font/google";
+import { Montserrat, Lato, Manrope } from "next/font/google";
 import "./globals.css";
 
 // Primary font - clean and professional
@@ -18,6 +18,13 @@ const lato = Lato({
   display: 'swap',
 });
 
+// "2026" Modern Industrial Font
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -25,7 +32,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${montserrat.variable} ${lato.variable} font-sans`}>
+      <body className={`${montserrat.variable} ${lato.variable} ${manrope.variable} font-sans`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
